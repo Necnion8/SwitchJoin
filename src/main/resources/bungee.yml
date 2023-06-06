@@ -1,0 +1,5 @@
+name: SwitchJoin
+version: @version@
+main: com.gmail.necnionch.myplugin.switchjoin.bungee.SwitchJoin
+author: Necnion8
+softDepends: [DiscordConnect, ServerListPlus, N8ServerUtils]
