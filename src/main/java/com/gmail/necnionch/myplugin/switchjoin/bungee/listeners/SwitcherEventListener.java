@@ -3,22 +3,20 @@ package com.gmail.necnionch.myplugin.switchjoin.bungee.listeners;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.SwitcherServer;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.reporter.bungee.events.SwitcherServerRemoveEvent;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.reporter.bungee.events.SwitcherServerStateChangedEvent;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.SwitchJoin;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeeTimerManager;
+import com.gmail.necnionch.myplugin.switchjoin.common.config.SwitchJoinConfig;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
 
 public class SwitcherEventListener implements Listener {
-    private final SwitchJoin main;
+    private final BungeeTimerManager timerManager;
+    private final SwitchJoinConfig config;
 
-
-    public SwitcherEventListener(SwitchJoin main) {
-        this.main = main;
-    }
-
-    public static void register(SwitchJoin plugin) {
-        plugin.getProxy().getPluginManager().registerListener(plugin, new SwitcherEventListener(plugin));
+    public SwitcherEventListener(BungeeTimerManager timerManager) {
+        this.timerManager = timerManager;
+        this.config = timerManager.getConfig();
     }
 
 
@@ -27,37 +25,23 @@ public class SwitcherEventListener implements Listener {
         SwitcherServer sServer = event.getServer();
 
         switch (event.getState()) {
-            case STARTED:
-                main.getTemporaryServerBlacklist().remove(sServer.getId());
-
-                Long startTime = main.getStartingTimes().remove(sServer.getId());
+            case STARTED -> {
+                timerManager.serverBlacklist().remove(sServer.getId());
+                Long startTime = timerManager.startupTimes().remove(sServer.getId());
                 if (startTime != null) {
-                    main.getMainConfig().putStartTime(
-                            sServer.getId(), (int) ((System.currentTimeMillis() - startTime) / 1000)
-                    );
+                    config.putStartTime(sServer.getId(), (int) ((System.currentTimeMillis() - startTime) / 1000));
                 }
-
-                if (main.getMainConfig().getIsAutoCloseEmpty()) {
-                    String bungeeName = main.getMainConfig().getBungeeServerId(event.getServer().getId());
+                if (config.isAutoCloseEmpty()) {
+                    String bungeeName = config.getPlatformServerId(event.getServer().getId());
                     ServerInfo sInfo = ProxyServer.getInstance().getServerInfo(bungeeName);
                     if (sInfo != null) {
-                        main.getTimerManager().startTimer(sInfo);
+                        timerManager.startTimer(sInfo);
                     }
                 }
-                break;
-
-            case RUNNING:
-                main.getStartingTimes().put(sServer.getId(), System.currentTimeMillis());
-                break;
-
-            case STOPPED:
-            case STOPPING:
-                main.getTimerManager().stopTimer(event.getServer());
-                break;
-
-            default:
-                main.getStartingTimes().remove(sServer.getId());
-
+            }
+            case RUNNING -> timerManager.startupTimes().put(sServer.getId(), System.currentTimeMillis());
+            case STOPPED, STOPPING -> timerManager.stopTimer(event.getServer());
+            default -> timerManager.startupTimes().remove(sServer.getId());
         }
     }
 
@@ -65,7 +49,7 @@ public class SwitcherEventListener implements Listener {
     public void onServerRemove(SwitcherServerRemoveEvent event) {
         SwitcherServer server = event.getServer();
         if (server != null) {
-            main.getTimerManager().stopTimer(server);
+            timerManager.stopTimer(server);
         }
     }
 

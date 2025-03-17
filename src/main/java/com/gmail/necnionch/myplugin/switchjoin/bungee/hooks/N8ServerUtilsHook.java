@@ -2,11 +2,11 @@ package com.gmail.necnionch.myplugin.switchjoin.bungee.hooks;
 
 import com.gmail.necnionch.myplugin.n8serverutils.bungee.N8ServerUtilsAPI;
 import com.gmail.necnionch.myplugin.n8serverutils.bungee.N8ServerUtilsPlugin;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.ServerNameReplacer;
+import com.gmail.necnionch.myplugin.switchjoin.common.util.ServerNameResolver;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.plugin.Plugin;
 
-public class N8ServerUtilsHook implements ServerNameReplacer {
+public class N8ServerUtilsHook implements ServerNameResolver {
     private N8ServerUtilsAPI api;
 
     public N8ServerUtilsHook() {}

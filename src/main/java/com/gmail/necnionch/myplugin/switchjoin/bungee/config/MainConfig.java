@@ -1,6 +1,6 @@
-package com.gmail.necnionch.myplugin.switchjoin.bungee;
+package com.gmail.necnionch.myplugin.switchjoin.bungee.config;
 
-import com.gmail.necnionch.myplugin.switchjoin.common.BungeeConfigDriver;
+import com.gmail.necnionch.myplugin.switchjoin.common.config.SwitchJoinConfig;
 import net.md_5.bungee.api.plugin.Plugin;
 import net.md_5.bungee.config.Configuration;
 
@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
-public class MainConfig extends BungeeConfigDriver {
+public class MainConfig extends BungeeConfigDriver implements SwitchJoinConfig {
     private List<String> autoOpenJoinReasons = Collections.emptyList();
     private final Map<String, List<Integer>> lastStartTimes = Collections.synchronizedMap(new HashMap<>());
 
@@ -18,35 +18,43 @@ public class MainConfig extends BungeeConfigDriver {
     }
 
 
-    public boolean getIsAutoOpenJoin() {
+    @Override
+    public boolean isAutoOpenJoin() {
         return config.getBoolean("auto-open-join.enable", false);
     }
 
+    @Override
     public List<String> getAutoOpenJoinReasons() {
         return autoOpenJoinReasons;
     }
 
-    public String getFailToKickMessage() {
+    @Override
+    public String getMessageFailKick() {
         return config.getString("auto-open-join.fail-to-kick-message");
     }
 
-    public boolean getIsAutoCloseEmpty() {
+    @Override
+    public boolean isAutoCloseEmpty() {
         return getAutoCloseEmptySection().getBoolean("enable", false);
     }
 
+    @Override
     public int getAutoCloseTimerMinutes() {
         return getAutoCloseEmptySection().getInt("timer-minutes", 120);
     }
 
+    @Override
     public int getAutoCloseNotifyMinutes() {
         return getAutoCloseEmptySection().getInt("notify-minutes", 5);
     }
 
+    @Override
     public String getSwitcherServerId(String serverName) {
         return config.getString("servers." + serverName, null);
     }
 
-    public String getBungeeServerId(String switcherServerName) {
+    @Override
+    public String getPlatformServerId(String switcherServerName) {
         for (String bungeeName : config.getSection("servers").getKeys()) {
             String targetName = config.getString("servers." + bungeeName);
             if (switcherServerName.equals(targetName))
@@ -55,6 +63,7 @@ public class MainConfig extends BungeeConfigDriver {
         return null;
     }
 
+    @Override
     public void putStartTime(String serverId, int startTime) {
         List<Integer> times = lastStartTimes.get(serverId);
         if (times == null)
@@ -67,6 +76,7 @@ public class MainConfig extends BungeeConfigDriver {
         lastStartTimes.put(serverId, times);
     }
 
+    @Override
     public Integer getStartTime(String serverId) {
         if (lastStartTimes.containsKey(serverId)) {
             List<Integer> times = lastStartTimes.get(serverId);
@@ -78,23 +88,20 @@ public class MainConfig extends BungeeConfigDriver {
         return null;
     }
 
+    @Override
     public String getSlpStatusName(String key) {
         return config.getString("serverlistplus.status." + key.toUpperCase(), key);
     }
 
-    public String[] getSlpStatusNameKeys() {
-        return config.getSection("serverlistplus.status").getKeys().stream()
-                .map(String::toUpperCase)
-                .toArray(String[]::new);
-    }
-
     // setter
 
+    @Override
     public void setIsAutoOpenJoin(boolean enable) {
         config.set("auto-open-join.enable", enable);
         save();
     }
 
+    @Override
     public boolean addAutoJoinReason(String reason) {
         Set<String> set = new HashSet<>(autoOpenJoinReasons);
         boolean result = set.add(reason.toUpperCase());
@@ -104,6 +111,7 @@ public class MainConfig extends BungeeConfigDriver {
         return result;
     }
 
+    @Override
     public boolean removeAutoJoinReason(String reason) {
         Set<String> set = new HashSet<>(autoOpenJoinReasons);
         boolean result = set.remove(reason.toUpperCase());
@@ -113,21 +121,25 @@ public class MainConfig extends BungeeConfigDriver {
         return result;
     }
 
+    @Override
     public void setIsAutoCloseEmpty(boolean enable) {
         getAutoCloseEmptySection().set("enable", enable);
         save();
     }
 
+    @Override
     public void setAutoCloseTimerMinutes(int minutes) {
         getAutoCloseEmptySection().set("timer-minutes", minutes);
         save();
     }
 
+    @Override
     public void setAutoCloseNotifyMinutes(int minutes) {
         getAutoCloseEmptySection().set("notify-minutes", minutes);
         save();
     }
 
+    @Override
     public void addServer(String bungeeName, String switcherName) {
         Map<String, String> map = new HashMap<>();
         for (String bName : config.getSection("servers").getKeys()) {
@@ -138,22 +150,19 @@ public class MainConfig extends BungeeConfigDriver {
         save();
     }
 
+    @Override
     public void removeServer(String bungeeName) {
         config.set("servers." + bungeeName, null);
         save();
     }
 
-    public void setSlpStatusName(String key, String value) {
-        config.set("serverlistplus.status." + key.toUpperCase(), value);
+    @Override
+    public String[] getPlatformServers() {
+        return config.getSection("servers").getKeys().toArray(new String[0]);
     }
-
 
     private Configuration getAutoCloseEmptySection() {
         return config.getSection("auto-close-empty");
-    }
-
-    public String[] getBungeeServers() {
-        return config.getSection("servers").getKeys().toArray(new String[0]);
     }
 
 

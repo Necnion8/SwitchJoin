@@ -3,40 +3,36 @@ package com.gmail.necnionch.myplugin.switchjoin.bungee;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.SwitcherServer;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.utils.ServerState;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.v1.CraftSwitcherAPI;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.timer.StopTimer;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.timer.StopTimerManager;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.config.MainConfig;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeeMessage;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeePlatform;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeeServer;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeeTimerManager;
+import com.gmail.necnionch.myplugin.switchjoin.common.platform.PlatformServer;
+import com.gmail.necnionch.myplugin.switchjoin.common.timer.StopTimer;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.event.ServerConnectEvent;
-import net.md_5.bungee.api.event.TabCompleteEvent;
 import net.md_5.bungee.api.plugin.Command;
-import net.md_5.bungee.api.plugin.Listener;
-import net.md_5.bungee.event.EventHandler;
+import net.md_5.bungee.api.plugin.TabExecutor;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class MainCommand extends Command implements Listener {
-    private final SwitchJoin main;
-    private final MainConfig c;
+public class MainCommand extends Command implements TabExecutor {
 
-    public MainCommand(SwitchJoin main) {
+    private final BungeeTimerManager timerManager;
+    private final MainConfig config;
+    private final BungeePlatform platform;
+
+    public MainCommand(BungeeTimerManager timerManager, MainConfig config) {
         super("switchjoin", "switchjoin.command.switchjoin");
-        this.main = main;
-        this.c = main.getMainConfig();
-    }
-
-    public static void register(SwitchJoin plugin) {
-        MainCommand command = new MainCommand(plugin);
-        plugin.getProxy().getPluginManager().registerCommand(plugin, command);
-        plugin.getProxy().getPluginManager().registerListener(plugin, command);
+        this.timerManager = timerManager;
+        this.config = config;
+        this.platform = timerManager.getPlatform();
     }
 
     @Override
@@ -64,26 +60,26 @@ public class MainCommand extends Command implements Listener {
             if (args.check("open", true)) {
                 if (args.isEmpty()) {
                     // show current settings
-                    if (c.getIsAutoOpenJoin()) {
+                    if (config.isAutoOpenJoin()) {
                         info(s, "自動起動は&a有効&fになっています。");
-                        info(s, "&7応答するイベント: &o" + (String.join("&7, &o", c.getAutoOpenJoinReasons())));
+                        info(s, "&7応答するイベント: &o" + (String.join("&7, &o", config.getAutoOpenJoinReasons())));
                     } else {
                         info(s, "自動起動は&c無効&fになっています。");
                     }
 
                 } else if (args.check("toggle", true)) {
                     // toggle
-                    boolean toggled = !c.getIsAutoOpenJoin();
-                    c.setIsAutoOpenJoin(toggled);
+                    boolean toggled = !config.isAutoOpenJoin();
+                    config.setIsAutoOpenJoin(toggled);
                     info(s, "自動起動を" + ((toggled)?"&a有効":"&c無効") + "&fに設定しました。");
-                    if (c.getAutoOpenJoinReasons().isEmpty()) {
+                    if (config.getAutoOpenJoinReasons().isEmpty()) {
                         info(s, "&e応答するイベントが設定されていません。");
                         info(s, "&7/switchjoin config open addreason &fで設定してください。");
                     }
 
                 } else if (args.check("addReason", false)) {
                     // add reason
-                    if (c.addAutoJoinReason(args.get(0))) {
+                    if (config.addAutoJoinReason(args.get(0))) {
                         info(s, "応答するイベントタイプを追加しました。");
                     } else {
                         error(s, "既に追加されています。");
@@ -91,7 +87,7 @@ public class MainCommand extends Command implements Listener {
 
                 } else if (args.check("removeReason", false)) {
                     // remove reason
-                    if (c.removeAutoJoinReason(args.get(0))) {
+                    if (config.removeAutoJoinReason(args.get(0))) {
                         info(s, "応答するイベントタイプから除外しました。");
                     } else {
                         error(s, "既に除外されています。");
@@ -109,12 +105,12 @@ public class MainCommand extends Command implements Listener {
             } else if (args.check("close", true)) {
                 if (args.isEmpty()) {
                     // show current settings
-                    if (c.getIsAutoCloseEmpty()) {
+                    if (config.isAutoCloseEmpty()) {
                         info(s, "自動停止は&a有効&fになっています。");
-                        if (c.getAutoCloseTimerMinutes() > c.getAutoCloseNotifyMinutes() && c.getAutoCloseNotifyMinutes() > 0) {
-                            info(s, "&7タイマー時間: &f" + c.getAutoCloseTimerMinutes() + "分  &7(停止" + c.getAutoCloseNotifyMinutes() + "分前に通知)");
+                        if (config.getAutoCloseTimerMinutes() > config.getAutoCloseNotifyMinutes() && config.getAutoCloseNotifyMinutes() > 0) {
+                            info(s, "&7タイマー時間: &f" + config.getAutoCloseTimerMinutes() + "分  &7(停止" + config.getAutoCloseNotifyMinutes() + "分前に通知)");
                         } else {
-                            info(s, "&7タイマー時間: &f" + c.getAutoCloseTimerMinutes() + "分");
+                            info(s, "&7タイマー時間: &f" + config.getAutoCloseTimerMinutes() + "分");
                         }
                     } else {
                         info(s, "自動起動は&c無効&fになっています。");
@@ -122,10 +118,10 @@ public class MainCommand extends Command implements Listener {
 
                 } else if (args.check("toggle", true)) {
                     // toggle
-                    boolean toggled = !c.getIsAutoCloseEmpty();
-                    c.setIsAutoCloseEmpty(toggled);
+                    boolean toggled = !config.isAutoCloseEmpty();
+                    config.setIsAutoCloseEmpty(toggled);
                     info(s, "自動停止を" + ((toggled)?"&a有効":"&c無効") + "&fに設定しました。");
-                    if (c.getAutoCloseTimerMinutes() <= 0) {
+                    if (config.getAutoCloseTimerMinutes() <= 0) {
                         info(s, "&eタイマーが1分以上に設定されていません。");
                         info(s, "&7/switchjoin config close settimerminute &fで設定してください。");
                     }
@@ -134,7 +130,7 @@ public class MainCommand extends Command implements Listener {
                     // set
                     Integer minutes = args.getInteger(0);
                     if (minutes != null && minutes > 0) {
-                        c.setAutoCloseTimerMinutes(minutes);
+                        config.setAutoCloseTimerMinutes(minutes);
                         info(s, "自動停止タイマーを&e" + minutes + "&f分に設定しました。");
 
                     } else {
@@ -145,12 +141,12 @@ public class MainCommand extends Command implements Listener {
                     // set
                     Integer minutes = args.getInteger(0);
                     if (minutes != null && minutes >= 0) {
-                        c.setAutoCloseNotifyMinutes(minutes);
+                        config.setAutoCloseNotifyMinutes(minutes);
                         if (minutes == 0) {
                             info(s, "自動停止の通知を無効にしました。");
                         } else {
                             info(s, "自動停止 通知タイマーを&e" + minutes + "&f分に設定しました。");
-                            if (c.getAutoCloseTimerMinutes() <= c.getAutoCloseNotifyMinutes()) {
+                            if (config.getAutoCloseTimerMinutes() <= config.getAutoCloseNotifyMinutes()) {
                                 info(s, "&e停止タイマーより短い時間のみ通知が有効になります。");
                             }
                         }
@@ -177,8 +173,8 @@ public class MainCommand extends Command implements Listener {
             if (args.isEmpty()) {
                 // show servers
                 info(s, "設定されているサーバー: &7(Bungee設定名 / CraftSwitcher設定名)");
-                for (String bName : c.getBungeeServers()) {
-                    String tName = c.getSwitcherServerId(bName);
+                for (String bName : config.getPlatformServers()) {
+                    String tName = config.getSwitcherServerId(bName);
                     s.sendMessage(TextComponent.fromLegacyText(ChatColor.translateAlternateColorCodes('&',
                             "&6- &b" + bName + " &7>> &2" + tName
                     )));
@@ -188,7 +184,7 @@ public class MainCommand extends Command implements Listener {
                 // add
                 String[] split = args.get(0).split(":");
                 if (split.length == 2) {
-                    c.addServer(split[0], split[1]);
+                    config.addServer(split[0], split[1]);
                     info(s, "サーバーを追加しました。&7(Bungee: " + split[0] + ", CraftSwitcher: " + split[1] + ")");
                 } else {
                     error(s, "サーバーを &nBungee名:CraftSwitcher名&c で指定してください。");
@@ -196,7 +192,7 @@ public class MainCommand extends Command implements Listener {
 
             } else if (args.check("remove", false)) {
                 // remove
-                c.removeServer(args.get(0));
+                config.removeServer(args.get(0));
                 info(s, "サーバーを削除しました。");
 
             } else {
@@ -211,7 +207,7 @@ public class MainCommand extends Command implements Listener {
             if (args.isEmpty()) {
                 // show current
                 info(s, "タイマー一覧:");
-                for (StopTimer timer : main.getTimerManager().getTimers()) {
+                for (StopTimer<?, ?, ?> timer : timerManager.getTimers()) {
                     if (!timer.isRunning())
                         continue;
 
@@ -223,11 +219,11 @@ public class MainCommand extends Command implements Listener {
             } else if (args.check("start", false)) {
                 ServerInfo server = args.getServer(0);
                 if (server != null) {
-                    if (c.getSwitcherServerId(server.getName()) != null) {
-                        StopTimer timer = main.getTimerManager().getCurrentTimer(server);
+                    if (config.getSwitcherServerId(server.getName()) != null) {
+                        StopTimer<?, ?, ?> timer = timerManager.getCurrentTimer(server);
                         boolean restart = (timer != null) && timer.isRunning();
 
-                        main.getTimerManager().startTimer(server);
+                        timerManager.startTimer(server);
                         info(s, "タイマーを" + ((restart) ? "再" : "") + "起動しました。");
                     } else {
                         error(s, "そのサーバーは設定されていません。");
@@ -239,9 +235,9 @@ public class MainCommand extends Command implements Listener {
             } else if (args.check("stop", false)) {
                 ServerInfo server = args.getServer(0);
                 if (server != null) {
-                    StopTimer timer = main.getTimerManager().getCurrentTimer(server);
+                    StopTimer<BungeePlatform, BungeeMessage, BungeeServer> timer = timerManager.getCurrentTimer(server);
                     if (timer != null && timer.isRunning()) {
-                        main.getTimerManager().stopTimer(timer);
+                        timerManager.stopTimer(timer);
                         info(s, "タイマーを停止しました。");
 
                     } else {
@@ -261,7 +257,7 @@ public class MainCommand extends Command implements Listener {
             }
         } else if (args.check("reload", true)) {
             // reload configuration
-            if (main.getMainConfig().load()) {
+            if (config.load()) {
                 info(s, "設定ファイルを再読み込みしました。");
             } else {
                 error(s, "エラーが発生しました。ログを参照してください。");
@@ -281,128 +277,100 @@ public class MainCommand extends Command implements Listener {
         }
     }
 
-    @EventHandler
-    public void onTabComplete(TabCompleteEvent event) {
-        if (event.isCancelled())
-            return;
-        if (!(event.getSender() instanceof CommandSender))
-            return;
+    @Override
+    public Iterable<String> onTabComplete(CommandSender sender, String[] arguments) {
+        ArgumentParser args = new ArgumentParser(arguments);
+        if (args.isEmpty())
+            return Collections.emptySet();
 
-//        main.getLogger().warning("tabComplete: \"" + event.getCursor() + "\"");
-        ArgumentParser args = new ArgumentParser(event.getCursor().split(" "));
-        if (args.isEmpty() || !args.remove(0).equalsIgnoreCase("/" + getName()))
-            return;
-
-        CommandSender sender = (CommandSender) event.getSender();
-        if (!hasPermission(sender))
-            return;
-
-        if (event.getCursor().endsWith(" "))
-            args.add("");
-
-        List<String> sug = event.getSuggestions();
-//        main.getLogger().warning("args: \"" + (String.join("\", \"", args)) + "\"");
-
-        if (args.isEmpty()) {
-
-        } else if (args.check("config", false)) {
+        if (args.check("config", false)) {
             if (args.check("open", false)) {
-                if (args.check("toggle", false)) {
-
-                } else if (args.check("addReason", false)) {
+                if (args.check("addReason", false)) {
                     if (args.size() <= 1) {
-                        sug.addAll(generateTabComplete(args,
+                        return generateTabComplete(args,
                                 Stream.of(ServerConnectEvent.Reason.values())
                                         .map(ServerConnectEvent.Reason::name)
-                                        .filter(name -> !c.getAutoOpenJoinReasons().contains(name))
+                                        .filter(name -> !config.getAutoOpenJoinReasons().contains(name))
                                         .toArray(String[]::new)
-                        ));
+                        );
                     }
                 } else if (args.check("removeReason", false)) {
                     if (args.size() <= 1) {
-                        sug.addAll(generateTabComplete(args,
+                        return generateTabComplete(args,
                                 Stream.of(ServerConnectEvent.Reason.values())
                                         .map(ServerConnectEvent.Reason::name)
-                                        .filter(name -> c.getAutoOpenJoinReasons().contains(name))
+                                        .filter(name -> config.getAutoOpenJoinReasons().contains(name))
                                         .toArray(String[]::new)
-                        ));
+                        );
                     }
                 } else if (args.size() <= 1) {
-                    sug.addAll(generateTabComplete(args, "toggle", "addReason", "removeReason"));
+                    return generateTabComplete(args, "toggle", "addReason", "removeReason");
                 }
             } else if (args.check("close", false)) {
-                if (args.check("toggle", false)) {
-
-                } else if (args.check("setTimerMinute", false)) {
-
-                } else if (args.check("setNotifyTimerMinute", false)) {
-
-                } else if (args.size() <= 1) {
-                    sug.addAll(generateTabComplete(args, "toggle", "setTimerMinute", "setNotifyTimerMinute"));
+                if (args.size() <= 1) {
+                    return generateTabComplete(args, "toggle", "setTimerMinute", "setNotifyTimerMinute");
                 }
             } else if (args.size() <= 1) {
-                sug.addAll(generateTabComplete(args, "open", "close"));
+                return generateTabComplete(args, "open", "close");
             }
         } else if (args.check("server", false)) {
             if (args.check("add", false)) {
                 if (args.size() <= 1) {
                     List<String> list = new ArrayList<>();
 
-                    ProxyServer.getInstance().getServers().keySet().forEach(name -> {
-                        if (Arrays.asList(c.getBungeeServers()).contains(name))
+                    platform.getServers().stream().map(BungeeServer::getName).forEach(name -> {
+                        if (Arrays.asList(config.getPlatformServers()).contains(name))
                             return;
                         for (SwitcherServer sServer : CraftSwitcherAPI.getServers()) {
-                            if (c.getBungeeServerId(sServer.getId()) == null) {
+                            if (config.getPlatformServerId(sServer.getId()) == null) {
                                 list.add(name + ":" + sServer.getId());
                             }
                         }
                     });
-                    sug.addAll(generateTabComplete(args, list.toArray(new String[0])));
+                    return generateTabComplete(args, list.toArray(new String[0]));
                 }
 
             } else if (args.check("remove", false)) {
                 if (args.size() <= 1) {
-                    sug.addAll(generateTabComplete(args, c.getBungeeServers()));
+                    return generateTabComplete(args, config.getPlatformServers());
                 }
 
             } else if (args.size() <= 1) {
-                sug.addAll(generateTabComplete(args, "add", "remove"));
+                return generateTabComplete(args, "add", "remove");
 
             }
 
         } else if (args.check("timer", false)) {
-            StopTimerManager mgr = main.getTimerManager();
-
             if (args.check("start", false)) {
                 if (args.size() <= 1) {
-                    sug.addAll(generateTabComplete(args, Stream.of(CraftSwitcherAPI.getServers())
+                    return generateTabComplete(args, Stream.of(CraftSwitcherAPI.getServers())
                             .filter(s -> ServerState.STARTED.equals(s.getState()))
-                            .map(s -> c.getBungeeServerId(s.getId()))
+                            .map(s -> config.getPlatformServerId(s.getId()))
                             .filter(Objects::nonNull)
                             .toArray(String[]::new)
-                    ));
+                    );
                 }
 
             } else if (args.check("stop", false)) {
                 if (args.size() <= 1) {
-                    sug.addAll(generateTabComplete(args, Stream.of(mgr.getTimers())
+                    return generateTabComplete(args, Stream.of(timerManager.getTimers())
                             .filter(StopTimer::isRunning)
-                            .map(StopTimer::getBungeeServer)
-                            .map(ServerInfo::getName)
+                            .map(StopTimer::getPlatformServer)
+                            .map(PlatformServer::getName)
                             .toArray(String[]::new)
-                    ));
+                    );
                 }
 
             } else if (args.size() <= 1) {
-                sug.addAll(generateTabComplete(args, "start", "stop"));
+                return generateTabComplete(args, "start", "stop");
             }
 
         } else if (args.size() <= 1) {
-            sug.addAll(generateTabComplete(args, "config", "server", "timer", "reload"));
+            return generateTabComplete(args, "config", "server", "timer", "reload");
         }
 
+        return Collections.emptySet();
     }
-
 
     private void info(CommandSender s, String m) {
         s.sendMessage(TextComponent.fromLegacyText(
@@ -430,7 +398,7 @@ public class MainCommand extends Command implements Listener {
         }
     }
 
-    private String formatTimerRemaining(StopTimer timer) {
+    private String formatTimerRemaining(StopTimer<?, ?, ?> timer) {
         int remaining = timer.getMinutes() * 60 - (int) ((System.currentTimeMillis() - timer.getTimerStartedTime()) / 1000);
         int p1 = remaining % 60;
         int p2 = remaining / 60;

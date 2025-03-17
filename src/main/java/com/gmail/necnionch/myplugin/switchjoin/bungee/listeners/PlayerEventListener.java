@@ -1,12 +1,11 @@
 package com.gmail.necnionch.myplugin.switchjoin.bungee.listeners;
 
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.SwitcherServer;
-import com.gmail.necnionch.myapp.craftswitcherreportmodule.socket.data.ServerStartRequest;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.utils.ServerState;
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.v1.CraftSwitcherAPI;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.MainConfig;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.SwitchJoin;
-import com.gmail.necnionch.myplugin.switchjoin.bungee.events.SJoinAutoStartEvent;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeePlatform;
+import com.gmail.necnionch.myplugin.switchjoin.bungee.platform.BungeeTimerManager;
+import com.gmail.necnionch.myplugin.switchjoin.common.config.SwitchJoinConfig;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.BaseComponent;
@@ -19,27 +18,24 @@ import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
 
 public class PlayerEventListener implements Listener {
-    private final SwitchJoin main;
-    private final MainConfig config;
 
-    public PlayerEventListener(SwitchJoin main) {
-        this.main = main;
-        this.config = main.getMainConfig();
+    private final BungeePlatform platform;
+    private final BungeeTimerManager timerManager;
+    private final SwitchJoinConfig config;
 
+    public PlayerEventListener(BungeePlatform platform, BungeeTimerManager timerManager) {
+        this.platform = platform;
+        this.timerManager = timerManager;
+        this.config = timerManager.getConfig();
     }
-
-    public static void register(SwitchJoin plugin) {
-        plugin.getProxy().getPluginManager().registerListener(plugin, new PlayerEventListener(plugin));
-    }
-
 
     @EventHandler
     public void onConnect(ServerConnectEvent event) {
-        if (event.isCancelled() || !main.isAvailable())
+        if (event.isCancelled())
             return;
 
         // check enabling
-        if (!config.getIsAutoOpenJoin())
+        if (!config.isAutoOpenJoin())
             return;
         if (!config.getAutoOpenJoinReasons().contains(event.getReason().name()))
             return;
@@ -79,10 +75,10 @@ public class PlayerEventListener implements Listener {
         }
 
         // check failed starting
-        if (main.getTemporaryServerBlacklist().contains(sServer.getId())) {
-            main.getLogger().warning("Ignored because the last start failed.");
+        if (timerManager.serverBlacklist().contains(sServer.getId())) {
+            platform.getLogger().warn("Ignored because the last start failed.");
 
-            String kickMessage = config.getFailToKickMessage();
+            String kickMessage = config.getMessageFailKick();
             if (kickMessage != null && !kickMessage.isEmpty()) {
                 event.setCancelled(true);
 
@@ -137,78 +133,38 @@ public class PlayerEventListener implements Listener {
                 return;  // started, unknown and other
         }
 
-        main.getLogger().info("Request to start " + sServer.getId() + " server");
+        timerManager.startServer(event.getTarget(), sServer).thenAccept(r -> {
+            if (r.result().isDenied())
+                return;
 
-        sServer.startFuture()
-                .done((r) -> {
-                    String fail = "";
-                    if (r instanceof ServerStartRequest) {
-                        ServerStartRequest res = (ServerStartRequest) r;
-                        if (res.success)
-                            return;
-                        if (res.failMessage.equalsIgnoreCase("already running server"))  // TODO:
-                            return;
-                        fail = res.failMessage;
-                    }
-                    main.getLogger().warning(
-                            "Invalid start response: " + fail
-                    );
-                    main.getTemporaryServerBlacklist().add(sServer.getId());
-                })
-                .fail((e) -> {
-                    main.getLogger().warning(
-                            "Invalid start response: " + e.getMessage()
-                    );
-                    main.getTemporaryServerBlacklist().add(sServer.getId());
-                })
-                .schedule();
-
-        SJoinAutoStartEvent myEvent = SJoinAutoStartEvent.callEvent(event.getTarget(), sServer, event);
-        if (myEvent.isCancelled())
-            return;
-
-        if (myEvent.getBroadcastMessage() != null)
-            main.getProxy().broadcast(myEvent.getBroadcastMessage());
-
-        event.setCancelled(true);
-        BaseComponent[] text = TextComponent.fromLegacyText(
-                ChatColor.GOLD + "サーバーを起動します" + getStartRemainingTimeMessage(sServer.getId()));
-        if (event.getPlayer().getServer() != null) {
-            event.getPlayer().sendMessage(text);
-        } else {
-            event.getPlayer().disconnect(text);
-        }
+            event.setCancelled(true);
+            BaseComponent[] text = TextComponent.fromLegacyText(
+                    ChatColor.GOLD + "サーバーを起動します" + getStartRemainingTimeMessage(sServer.getId()));
+            if (event.getPlayer().getServer() != null) {
+                event.getPlayer().sendMessage(text);
+            } else {
+                event.getPlayer().disconnect(text);
+            }
+        });
     }
 
     @EventHandler
     public void onConnected(ServerConnectedEvent event) {
-        if (!main.isAvailable())
-            return;
-
-        main.getTimerManager().stopTimer(event.getServer().getInfo());
+        timerManager.onPlayerJoin(event.getServer().getInfo());
     }
 
     @EventHandler
     public void onDisconnect(ServerDisconnectEvent event) {
-        if (!main.isAvailable())
-            return;
-
-        if (!config.getIsAutoCloseEmpty())
-            return;
-
-        if (event.getTarget().getPlayers().isEmpty()) {
-            main.getTimerManager().startTimer(event.getTarget());
-        }
+        timerManager.onPlayerQuit(event.getTarget());
     }
 
 
-
     private Integer getStartRemainingTime(String serverId) {
-        Integer lastStartTime = main.getMainConfig().getStartTime(serverId);
+        Integer lastStartTime = config.getStartTime(serverId);
         if (lastStartTime == null)
             return null;
 
-        Long starting = main.getStartingTimes().get(serverId);
+        Long starting = timerManager.startupTimes().get(serverId);
         if (starting == null)
             return lastStartTime;
 
@@ -229,8 +185,5 @@ public class PlayerEventListener implements Listener {
 
         return ChatColor.WHITE + " / " + ChatColor.GRAY + "完了までおよそ" + roundedTime + "秒";
     }
-
-
-
 
 }

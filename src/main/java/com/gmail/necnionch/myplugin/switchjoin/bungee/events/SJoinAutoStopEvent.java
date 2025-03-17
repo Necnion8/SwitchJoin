@@ -1,34 +1,15 @@
 package com.gmail.necnionch.myplugin.switchjoin.bungee.events;
 
 import com.gmail.necnionch.myapp.craftswitcherreportmodule.SwitcherServer;
-import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.plugin.Cancellable;
-import net.md_5.bungee.api.plugin.Event;
 
-public class SJoinAutoStopEvent extends Event implements Cancellable {
-    private boolean cancelled = false;
-    private final ServerInfo serverInfo;
-    private final SwitcherServer switcherServer;
+public class SJoinAutoStopEvent extends ServerEvent implements Cancellable {
 
-    public SJoinAutoStopEvent(ServerInfo serverInfo, SwitcherServer switcherServer) {
-        this.serverInfo = serverInfo;
-        this.switcherServer = switcherServer;
+    private boolean cancelled;
 
-    }
-
-    public static SJoinAutoStopEvent callEvent(ServerInfo serverInfo, SwitcherServer switcherServer) {
-        SJoinAutoStopEvent event = new SJoinAutoStopEvent(serverInfo, switcherServer);
-        ProxyServer.getInstance().getPluginManager().callEvent(event);
-        return event;
-    }
-
-    public ServerInfo getServerInfo() {
-        return serverInfo;
-    }
-
-    public SwitcherServer getSwitcherServer() {
-        return switcherServer;
+    public SJoinAutoStopEvent(ServerInfo server, SwitcherServer switcherServer) {
+        super(server, switcherServer);
     }
 
     @Override
@@ -37,7 +18,8 @@ public class SJoinAutoStopEvent extends Event implements Cancellable {
     }
 
     @Override
-    public void setCancelled(boolean cancel) {
-        this.cancelled = cancel;
+    public void setCancelled(boolean cancelled) {
+        this.cancelled = cancelled;
     }
+
 }

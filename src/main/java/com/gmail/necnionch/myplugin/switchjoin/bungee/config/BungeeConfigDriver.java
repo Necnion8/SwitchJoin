@@ -1,4 +1,4 @@
-package com.gmail.necnionch.myplugin.switchjoin.common;
+package com.gmail.necnionch.myplugin.switchjoin.bungee.config;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.ByteStreams;
