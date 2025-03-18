@@ -68,6 +68,7 @@ public final class SwitchJoinPlugin extends Plugin {
 
         if (slpPlaceholder != null) {
             ServerListPlusPlaceholder.unregister((ServerListPlusPlaceholder) slpPlaceholder);
+            slpPlaceholder = null;
         }
     }
 
