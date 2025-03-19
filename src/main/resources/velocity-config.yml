@@ -1,0 +1,17 @@
+auto-open-join:
+  enable: true
+  reason: [JOIN_PROXY]
+  fail-to-kick-message: "&cサーバーの起動に失敗しました。管理者にお知らせください。"
+auto-close-empty:
+  enable: true
+  timer-minutes: 60
+  notify-minutes: 5
+servers: {}
+last-start-time: {}
+serverlistplus:
+  status:
+    UNKNOWN: "&7?????"
+    STARTED: "&a参加可"
+    STOPPED: "&c停止"
+    STARTING: "&e起動中"
+    RUNNING: "&e起動中"

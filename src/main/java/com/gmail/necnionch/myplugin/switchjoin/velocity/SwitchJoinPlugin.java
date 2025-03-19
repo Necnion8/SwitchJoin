@@ -44,7 +44,7 @@ public class SwitchJoinPlugin {
         this.server = server;
         this.logger = logger;
         this.platform = new VelocityPlatform(this, logger, server);
-        this.mainConfig = new MainConfig(logger, dataFolder.toFile());
+        this.mainConfig = new MainConfig(logger, dataFolder);
         this.timerManager = new VelocityTimerManager(platform, mainConfig);
 
         this.availableSwitcher = TimerManager.testSwitcherAPI();
